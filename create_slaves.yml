@@ -1,0 +1,169 @@
+---
+
+- hosts: localhost
+  connection: local
+  vars:
+    machine_type: n1-standard-1 # default
+    metadata: '{"ansible_host_groups":"mesos-slaves2"}'
+    image: debian-7
+    service_account_email: unique-id@developer.gserviceaccount.com                                      
+    pem_file: /path/to/key.pem
+    project_id: project-id
+    nbr_of_n1_standard_1: 2
+    nbr_of_n1_standard_2: 0
+    nbr_of_n1_standard_4: 0
+    nbr_of_n1_standard_8: 0
+    minus_term: 0
+  tasks:
+
+  # You may look at this and think, "What is this madness? All we need to do
+  # is create n nodes of each type," to which I say, "You're right, and this is
+  # the only sane way I've found of doing that." You see, I want to iterate n 
+  # times to create n nodes. So what are the different cases that are causing this
+  # mess?
+  # (1) Create 0 nodes
+  # (2) Create 1 nodes
+  # (3) Create >=2 nodes
+  # Realistically, with_sequence should fit all of these needs. Setting start=1,
+  # and end=0 should result in the task being skipped, but instead you get an error.
+  # Okay, fine, let's set start=0, end=0. This works, and the task is skipped.
+  # How about start=0, end=1? Well, this iterates over {0,1} which is more nodes
+  # than the user actually wants. Essentially, with_sequence can never give you a
+  # loop where the set is a single element. So this is why I've created two cases
+  # using the "when" clause. When the number of nodes is equal to 1, just create one
+  # node without using a loop. When the number of nodes is greater than 1, use
+  # a loop. BUT, recall that we had to use 0 as our start value, so if we loop to 2
+  # we'd end up creating 3 nodes {0, 1, 2}. So let's just subtract 1 from the end
+  # value. Sadly, we can't always subtract 1, because if the number of nodes is 0,
+  # the end value would be -1, causing a fatal error. This is awful in general
+  # because that sequence will never be evaluated since we have that "when" clause,
+  # but Ansible does not care. As a result, there is the minus_term which will be 0
+  # or 1 depending on whether or not we will use the loop.
+  # So that's my rationalization for why it takes 138 lines to spin up four types of
+  # nodes. It's very possible that this could be accomplished more easily with jinja2
+  # but I only discovered that after I managed to get this working, maybe I'll give
+  # that a try at some point.
+
+  - set_fact: minus_term=0
+  - when: nbr_of_n1_standard_1 > 1
+    set_fact: minus_term=1
+
+  - name: Create multiple n1-standard-1 slaves
+    when: nbr_of_n1_standard_1 > 1
+    gce:
+      instance_names: "{{ item }}"
+      machine_type: n1-standard-1
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"slave-std1"}'
+    with_sequence:
+      start=0
+      end="{{ nbr_of_n1_standard_1|int - minus_term|int }}"
+      format="slave-std1-{{ ansible_date_time.epoch }}-%02x"
+    register: slave-1
+  - name: Create a single n1-standard-1 slave
+    when: nbr_of_n1_standard_1 == 1
+    gce:
+      instance_names: "slave-std1-{{ ansible_date_time.epoch }}-00"
+      machine_type: n1-standard-1
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"mesos-slave"}'
+    register: slave-1
+
+  - set_fact: minus_term=0
+  - when: nbr_of_n1_standard_2 > 1
+    set_fact: minus_term=1
+
+  - name: Create n1-standard-2 slaves
+    gce:
+      instance_names: "{{ item }}"
+      machine_type: n1-standard-2
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"mesos-slave"}'
+    with_sequence:
+      start=0
+      end="{{ nbr_of_n1_standard_2|int - minus_term|int }}"
+      format="slave-std2-{{ ansible_date_time.epoch }}-%02x"
+    register: slave-2
+    when: nbr_of_n1_standard_2 > 1
+  - name: Create a single n1-standard-2 slave
+    when: nbr_of_n1_standard_2 == 1
+    gce:
+      instance_names: "slave-std2-{{ ansible_date_time.epoch }}-00"
+      machine_type: n1-standard-2
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"mesos-slave"}'
+    register: slave-2
+
+  - set_fact: minus_term=0
+  - when: nbr_of_n1_standard_4 > 1
+    set_fact: minus_term=1
+
+  - name: Create n1-standard-4 slaves
+    gce:
+      instance_names: "{{ item }}"
+      machine_type: n1-standard-4
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"mesos-slave"}'
+    with_sequence:
+      start=0
+      end="{{ nbr_of_n1_standard_4|int - minus_term|int }}"
+      format="slave-std4-{{ ansible_date_time.epoch }}-%02x"
+    register: slave-4
+    when: nbr_of_n1_standard_4 > 1
+  - name: Create a single n1-standard-4 slave
+    when: nbr_of_n1_standard_4 == 1
+    gce:
+      instance_names: "slave-std4-{{ ansible_date_time.epoch }}-00"
+      machine_type: n1-standard-4
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"mesos-slave"}'
+    register: slave-4
+
+  - set_fact: minus_term=0
+  - when: nbr_of_n1_standard_8 > 1
+    set_fact: minus_term=1
+
+  - name: Create n1-standard-8 slaves
+    gce:
+      instance_names: "{{ item }}"
+      machine_type: n1-standard-8
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"mesos-slave"}'
+    with_sequence:
+      start=0
+      end="{{ nbr_of_n1_standard_8|int - minus_term|int }}"
+      format="slave-std8-{{ ansible_date_time.epoch }}-%02x"
+    register: slave-8
+    when: nbr_of_n1_standard_8 > 1
+  - name: Create a single n1-standard-8 slave
+    when: nbr_of_n1_standard_8 == 1
+    gce:
+      instance_names: "slave-std8-{{ ansible_date_time.epoch }}-00"
+      machine_type: n1-standard-8
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"mesos-slave"}'
+    register: slave-8

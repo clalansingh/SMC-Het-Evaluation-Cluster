@@ -1,0 +1,22 @@
+---
+
+- hosts: localhost
+  connection: local
+  vars:
+    machine_type: n1-standard-1 # default
+    image: debian-7
+    service_account_email: unique-id@developer.gserviceaccount.com
+    pem_file: /path/to/key.pem
+    project_id: project-id
+    nbr_of_slaves: 2
+  tasks:
+  - name: Create a new mesos master instance
+    gce:
+      instance_names: mesos-master
+      machine_type: "{{ machine_type }}"
+      image: "{{ image }}"
+      service_account_email: "{{ service_account_email }}"
+      pem_file: "{{ pem_file }}"
+      project_id: "{{ project_id }}"
+      metadata: '{"ansible_host_groups":"mesos_masters,zookeepers"}'
+    register: master
