@@ -18,8 +18,10 @@ SMC-Het-Evaluation-Cluster
 
 ## Deploying the cluster
 
-* ```ansible-playbook -i localhost_inventory --private-key ~/.ssh/pkey.pem gce_create_nodes.yml```
-* ```ansible-playbook -vvvv -i gce.py --private-key ~/.ssh/pkey.pem gce_install_software.yml```
+* ```ansible-playbook -i localhost_inventory --private-key ~/.ssh/pkey.pem create_master.yml```
+* ```ansible-playbook -vvvv -i gce.py --private-key ~/.ssh/pkey.pem configure_master.yml```
+* ```ansible-playbook -i localhost_inventory --private-key ~/.ssh/pkey.pem create_slaves.yml```
+* ```ansible-playbook -vvvv -i gce.py --private-key ~/.ssh/pkey.pem configure_slaves.yml```
 
 You can now open the SSH terminal for mesos-master (Compute --> Compute Engine --> VM Instances) and dispatch jobs to the slave VMs with commands like the following:
 	```mesos-execute --command="mkdir /home/username/test" --master=mesos-master:5050 --name=test```
